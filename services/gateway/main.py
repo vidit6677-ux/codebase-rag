@@ -14,9 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-EMBEDDING_URL = "http://localhost:8001"
-RETRIEVAL_URL = "http://localhost:8002"
-GENERATION_URL = "http://localhost:8003"
+import os
+
+EMBEDDING_URL = os.environ.get("EMBEDDING_URL", "http://localhost:8001")
+RETRIEVAL_URL = os.environ.get("RETRIEVAL_URL", "http://localhost:8002")
+GENERATION_URL = os.environ.get("GENERATION_URL", "http://localhost:8003")
 
 app = FastAPI(title="Gateway Service")
 
@@ -83,4 +85,4 @@ def health():
     return {"status": "ok", "service": "gateway"}
 
 
-app.mount("/", StaticFiles(directory="../../frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory="./frontend", html=True), name="frontend")

@@ -1,0 +1,30 @@
+services:
+  embedding:
+    build: ./services/embedding
+    ports:
+      - "8001:8001"
+
+  retrieval:
+    build: ./services/retrieval
+    ports:
+      - "8002:8002"
+
+  generation:
+    build: ./services/generation
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./services/generation/.env
+
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - embedding
+      - retrieval
+      - generation
+    environment:
+      - EMBEDDING_URL=http://embedding:8001
+      - RETRIEVAL_URL=http://retrieval:8002
+      - GENERATION_URL=http://generation:8003
