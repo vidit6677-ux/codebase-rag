@@ -4,3 +4,5 @@ __pycache__/
 .env
 backend/index_store/
 data/
+services/*/index_store/
+services/*/.env
