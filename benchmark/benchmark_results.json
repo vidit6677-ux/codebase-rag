@@ -1,0 +1,7 @@
+{
+  "test_cases": 10,
+  "avg_no_rag_score": 0.25,
+  "avg_rag_score": 0.8,
+  "avg_no_rag_time": 0.9435554265975952,
+  "avg_rag_time": 1.095818853378296
+}

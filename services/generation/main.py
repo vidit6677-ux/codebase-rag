@@ -40,10 +40,12 @@ class GenerateResponse(BaseModel):
 
 
 def build_prompt(question: str, sources: list[SourceChunk]) -> str:
+    MAX_CHARS_PER_CHUNK = 1500  # keeps total prompt size well within token limits
     context_blocks = []
     for i, s in enumerate(sources):
+        text = s.text[:MAX_CHARS_PER_CHUNK]
         context_blocks.append(
-            f"[Source {i+1}: {s.file_path}:{s.start_line}-{s.end_line}]\n{s.text}"
+            f"[Source {i+1}: {s.file_path}:{s.start_line}-{s.end_line}]\n{text}"
         )
     context = "\n\n".join(context_blocks)
     return f"""You are a C++ codebase expert answering questions about the nlohmann/json library.
