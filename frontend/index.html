@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Codebase RAG — nlohmann/json</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --code-bg: #010409;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 40px 20px;
+  }
+  .container { max-width: 780px; width: 100%; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+  .search-box { display: flex; gap: 8px; margin-bottom: 24px; }
+  input[type="text"] {
+    flex: 1; padding: 12px 14px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 0.95rem;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  button {
+    padding: 12px 20px; background: var(--accent); border: none; border-radius: 8px;
+    color: #0d1117; font-weight: 600; cursor: pointer; font-size: 0.95rem;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .example-chip {
+    font-size: 0.8rem; color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 16px; cursor: pointer;
+  }
+  .example-chip:hover { border-color: var(--accent); color: var(--accent); }
+  #answer-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+    margin-bottom: 20px; display: none; white-space: pre-wrap; line-height: 1.55; font-size: 0.95rem;
+  }
+  #loading { display: none; color: var(--muted); margin-bottom: 20px; }
+  .sources-title { font-size: 0.85rem; color: var(--muted); margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .source-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .source-header {
+    padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;
+  }
+  .source-path { color: var(--accent); font-family: monospace; }
+  .source-score { color: var(--muted); font-size: 0.75rem; }
+  .source-code {
+    display: none; background: var(--code-bg); padding: 14px; overflow-x: auto;
+    font-family: "SF Mono", Monaco, monospace; font-size: 0.8rem; border-top: 1px solid var(--border); white-space: pre;
+  }
+  .error { color: #f85149; background: #2d0f0f; border: 1px solid #f85149; padding: 12px 14px; border-radius: 8px; margin-bottom: 20px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Codebase RAG</h1>
+  <div class="subtitle">Ask questions about the <code>nlohmann/json</code> C++ library — answers are grounded in the actual source with citations.</div>
+
+  <div class="search-box">
+    <input type="text" id="question" placeholder="e.g. How does the parser handle malformed JSON?" />
+    <button id="ask-btn">Ask</button>
+  </div>
+
+  <div class="examples">
+    <span class="example-chip" onclick="setExample(this)">How does the parser detect JSON errors?</span>
+    <span class="example-chip" onclick="setExample(this)">How is comparison between JSON values implemented?</span>
+    <span class="example-chip" onclick="setExample(this)">How does the library handle Unicode strings?</span>
+  </div>
+
+  <div id="loading">Searching codebase and generating answer...</div>
+  <div id="error-box"></div>
+  <div id="answer-panel"></div>
+
+  <div id="sources-container"></div>
+</div>
+
+<script>
+const API_BASE = "";
+
+function setExample(el) {
+  document.getElementById("question").value = el.textContent;
+  askQuestion();
+}
+
+document.getElementById("ask-btn").addEventListener("click", askQuestion);
+document.getElementById("question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") askQuestion();
+});
+
+async function askQuestion() {
+  const question = document.getElementById("question").value.trim();
+  if (!question) return;
+
+  const askBtn = document.getElementById("ask-btn");
+  const loading = document.getElementById("loading");
+  const answerPanel = document.getElementById("answer-panel");
+  const sourcesContainer = document.getElementById("sources-container");
+  const errorBox = document.getElementById("error-box");
+
+  askBtn.disabled = true;
+  loading.style.display = "block";
+  answerPanel.style.display = "none";
+  sourcesContainer.innerHTML = "";
+  errorBox.innerHTML = "";
+
+  try {
+    const res = await fetch(`${API_BASE}/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Request failed");
+    }
+
+    const data = await res.json();
+
+    answerPanel.textContent = data.answer;
+    answerPanel.style.display = "block";
+
+    if (data.sources && data.sources.length > 0) {
+      const title = document.createElement("div");
+      title.className = "sources-title";
+      title.textContent = `Sources (${data.sources.length})`;
+      sourcesContainer.appendChild(title);
+
+      data.sources.forEach((s) => {
+        const card = document.createElement("div");
+        card.className = "source-card";
+
+        const header = document.createElement("div");
+        header.className = "source-header";
+        header.innerHTML = `
+          <span class="source-path">${s.file_path}:${s.start_line}-${s.end_line}</span>
+          <span class="source-score">similarity ${s.score.toFixed(3)}</span>
+        `;
+
+        const codeBlock = document.createElement("div");
+        codeBlock.className = "source-code";
+        codeBlock.textContent = s.text;
+
+        header.addEventListener("click", () => {
+          codeBlock.style.display = codeBlock.style.display === "block" ? "none" : "block";
+        });
+
+        card.appendChild(header);
+        card.appendChild(codeBlock);
+        sourcesContainer.appendChild(card);
+      });
+    }
+  } catch (e) {
+    errorBox.innerHTML = `<div class="error">${e.message}</div>`;
+  } finally {
+    askBtn.disabled = false;
+    loading.style.display = "none";
+  }
+}
+</script>
+</body>
+</html>
