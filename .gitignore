@@ -1,8 +1,7 @@
-venv/
+﻿venv/
 __pycache__/
 *.pyc
 .env
 backend/index_store/
 data/
-services/*/index_store/
 services/*/.env
