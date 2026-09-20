@@ -1,66 +1,31 @@
-# CodeRAG — Retrieval-Augmented Q&A for C++ Codebases
+# Codebase RAG — nlohmann/json Q&A
 
-Ask natural-language questions about a C++ codebase and get answers grounded in the actual source code, with file:line citations you can verify.
+Ask natural-language questions about the `nlohmann/json` C++ library and get
+answers grounded in the actual source code, with file:line citations you can
+expand and inspect.
 
-Built against [nlohmann/json](https://github.com/nlohmann/json) as the demo target.
+**🔗 Live demo: https://gateway-production-24f8.up.railway.app**
 
 ## How it works
-1. **Chunking** (`chunker.py`) — splits C++ source into function/class-level chunks using brace-matching
-2. **Embedding + indexing** (`build_index.py`) — embeds every chunk locally with `sentence-transformers`, builds a FAISS vector index
-3. **Retrieval + generation** (`main.py`) — FastAPI backend: embeds the question, retrieves top-5 relevant chunks, sends them + the question to Groq's free LLM API, returns a cited answer
-4. **Frontend** (`index.html`) — plain HTML/JS UI, no build step
+1. `chunker.py` splits the C++ source into function/class-level chunks (brace-matching, not naive line splitting)
+2. `build_index.py` embeds every chunk locally (`sentence-transformers`) and builds a FAISS vector index
+3. A retrieval step finds the top-k relevant chunks for a question, then an LLM (Groq, free tier) generates a cited answer grounded in those chunks
+4. `frontend/index.html` is a plain HTML/JS UI — no build step needed
 
-## Setup
+Everything is free except the LLM call, which uses Groq's free tier (fast, no card required).
 
-```bash
-# 1. Clone this repo, then create a virtual environment
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # macOS/Linux
+### Two ways to run this
+- **`backend/`** — a single self-contained FastAPI app (embedding + retrieval + generation in one process). Simplest way to run locally.
+- **`services/`** — the same system split into 4 independent microservices (`embedding`, `retrieval`, `generation`, `gateway`), each with its own Dockerfile. This is what's actually deployed live (see [Architecture](#architecture) and [Deployment](#deployment) below).
 
-# 2. Install dependencies
-pip install -r requirements.txt
+## Results
+Benchmarked RAG vs. no-RAG on 10 questions about the codebase (keyword-match accuracy proxy):
 
-# 3. Clone the target C++ repo into data/
-mkdir data
-git clone --depth 1 https://github.com/nlohmann/json.git data/nlohmann-json
+| | Accuracy | Avg. latency |
+|---|---|---|
+| No RAG (direct to LLM) | 25% | 0.94s |
+| **With RAG** | **80%** | 1.10s |
 
-# 4. Get a free Groq API key at console.groq.com, then create .env:
-#    GROQ_API_KEY=gsk_your_key_here
+**+55 percentage points of accuracy for ~150ms of extra latency.** See `benchmark/` for the harness and `benchmark/benchmark_results.json` for raw results.
 
-# 5. Build the index (embeds ~876 code chunks, takes 1-3 min)
-cd backend
-python build_index.py
-
-# 6. Run the server
-uvicorn main:app --reload --port 8000
-```
-
-Open **http://localhost:8000** and ask a question.
-
-## Project structure
-```
-codebase-rag-kit/
-├── requirements.txt
-├── .env                  # not committed — holds GROQ_API_KEY
-├── data/                 # not committed — cloned target repo
-├── backend/
-│   ├── chunker.py        # C++-aware code chunking
-│   ├── build_index.py    # embed + build FAISS index (run once)
-│   ├── main.py           # FastAPI: retrieval + generation
-│   └── index_store/      # not committed — generated FAISS index
-└── frontend/
-    └── index.html        # single-page UI
-```
-
-## Notes / limitations
-- Chunker uses brace-matching, not a real parser — works well for straightforward function/class code but can misparse heavily templated or macro-heavy code.
-- Retrieval is pure vector similarity — no re-ranking step yet.
-- No streaming responses — the answer appears all at once.
-- Groq's free-tier available models change over time; if you get a "model not found" error, check available models for your key at `https://api.groq.com/openai/v1/models`.
-
-## Roadmap
-- [ ] Dockerize
-- [ ] Split into microservices (embedding / retrieval / generation / gateway)
-- [ ] Deploy to GCP Cloud Run
-- [ ] Benchmark script: RAG vs no-RAG accuracy and latency
+## Architecture
